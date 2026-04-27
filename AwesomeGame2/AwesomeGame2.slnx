@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="AwesomeGame2.Shared/AwesomeGame2.Shared.csproj" />
+  <Project Path="AwesomeGame2Console/AwesomeGame2Console.csproj" />
+</Solution>
