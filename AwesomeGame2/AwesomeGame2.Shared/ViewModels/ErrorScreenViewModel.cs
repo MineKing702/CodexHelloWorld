@@ -1,7 +1,8 @@
 namespace AwesomeGame2.Shared.ViewModels;
 
-public sealed record TownScreenViewModel(
+public sealed record ErrorScreenViewModel(
     PlayerStatusViewModel PlayerStatus,
+    string ErrorMessage,
     IReadOnlyList<MenuOptionViewModel> MenuOptions,
     ToastViewModel? Toast)
-    : ScreenViewModel("town", "Town Square", PlayerStatus, MenuOptions, Toast);
+    : ScreenViewModel("error", "Invalid Command", PlayerStatus, MenuOptions, Toast);

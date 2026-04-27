@@ -1,3 +1,4 @@
+using AwesomeGame2.Shared.Content;
 using AwesomeGame2.Shared.Models;
 
 namespace AwesomeGame2.Shared.Saves;
@@ -20,12 +21,12 @@ public static class GameSaveFactory
                 Level = 1,
                 Experience = 0,
                 Gold = 25,
-                Health = 100,
-                MaxHealth = 100
+                Health = 30,
+                MaxHealth = 30
             },
-            CurrentLocation = "town",
+            CurrentLocation = "main_menu",
             DayNumber = 1,
-            RemainingDailyActions = 20,
+            RemainingDailyActions = GameRules.DailyActionLimit,
             Inventory =
             [
                 new InventoryItem
