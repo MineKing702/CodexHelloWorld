@@ -1,6 +1,14 @@
-namespace AwesomeGame2.Shared.Models;
+using System.Collections.Generic;
 
-public sealed class ProgressionFlags
+namespace AwesomeGame2.Shared.Models
 {
-    public HashSet<string> Flags { get; set; } = [];
+    public sealed class ProgressionFlags
+    {
+        public HashSet<string> Flags { get; set; }
+
+        public ProgressionFlags()
+        {
+            Flags = new HashSet<string>();
+        }
+    }
 }

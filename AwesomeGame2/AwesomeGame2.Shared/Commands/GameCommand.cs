@@ -1,3 +1,4 @@
-namespace AwesomeGame2.Shared.Commands;
-
-public abstract record GameCommand;
+namespace AwesomeGame2.Shared.Commands
+{
+    public abstract record GameCommand;
+}

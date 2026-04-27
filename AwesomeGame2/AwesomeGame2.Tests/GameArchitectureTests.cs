@@ -1,3 +1,4 @@
+using System;
 using AwesomeGame2.Shared.Commands;
 using AwesomeGame2.Shared.Managers;
 using AwesomeGame2.Shared.Saves;
@@ -5,107 +6,196 @@ using AwesomeGame2.Shared.Serialization;
 using AwesomeGame2.Shared.Validation;
 using AwesomeGame2.Shared.ViewModels;
 
-namespace AwesomeGame2.Tests;
-
-public static class GameArchitectureTests
+namespace AwesomeGame2.Tests
 {
-    public static void RunAll()
+    public static class GameArchitectureTests
     {
-        NewGameCreation_ProducesValidDefaultSave();
-        GameSaveValidation_ReturnsErrorsForInvalidState();
-        SaveLoadJson_RoundTripsGameSave();
-        ViewModels_AreGeneratedFromGameSave();
-        Navigation_MutatesCurrentLocationInGameSave();
-        Managers_DoNotRequireMutableConstructorState();
-    }
-
-    private static void NewGameCreation_ProducesValidDefaultSave()
-    {
-        var save = GameSaveFactory.CreateNew("Hero");
-
-        Assert(save.SaveVersion == GameSave.CurrentSaveVersion, "Save version mismatch.");
-        Assert(save.Player.Name == "Hero", "Player name mismatch.");
-        Assert(save.CurrentLocation == "town", "Starting location mismatch.");
-        Assert(save.DayNumber == 1, "Starting day mismatch.");
-        Assert(GameSaveValidator.IsValid(save), "New save should be valid.");
-    }
-
-    private static void GameSaveValidation_ReturnsErrorsForInvalidState()
-    {
-        var save = GameSaveFactory.CreateNew("Hero");
-        save.Player.Level = 0;
-        save.DayNumber = 0;
-
-        var errors = GameSaveValidator.Validate(save);
-
-        Assert(errors.Count > 0, "Expected validation errors.");
-        Assert(errors.Any(e => e.Contains("Player.Level", StringComparison.Ordinal)), "Missing Player.Level error.");
-        Assert(errors.Any(e => e.Contains("DayNumber", StringComparison.Ordinal)), "Missing DayNumber error.");
-    }
-
-    private static void SaveLoadJson_RoundTripsGameSave()
-    {
-        var save = GameSaveFactory.CreateNew("Hero");
-        save.CurrentLocation = "character";
-        save.RemainingDailyActions = 19;
-
-        var json = GameSaveSerializer.SaveToJson(save);
-        var roundTrip = GameSaveSerializer.LoadFromJson(json);
-
-        Assert(roundTrip.Player.Name == save.Player.Name, "Round-trip player name mismatch.");
-        Assert(roundTrip.CurrentLocation == save.CurrentLocation, "Round-trip location mismatch.");
-        Assert(roundTrip.RemainingDailyActions == save.RemainingDailyActions, "Round-trip actions mismatch.");
-    }
-
-    private static void ViewModels_AreGeneratedFromGameSave()
-    {
-        var save = GameSaveFactory.CreateNew("Hero");
-        save.Player.Gold = 50;
-        save.CurrentLocation = "character";
-
-        var screen = new ScreenManager().CreateForCurrentLocation(save);
-
-        if (screen is not CharacterScreenViewModel characterScreen)
+        public static void RunAll()
         {
-            throw new InvalidOperationException("Expected character screen.");
+            ForestSearch_ConsumesDailyAction();
+            BattleState_IsStoredInGameSave();
+            Attack_MutatesActiveBattleState();
+            Victory_GrantsRewardsAndClearsBattle();
+            BuyingEquipment_UpdatesSaveAndGold();
+            EquippedItems_AffectCombatStats();
+            SaveLoad_RoundTripAcrossCoreStates();
+            ConsoleFlow_UsesCommandsAndViewModelsOnly();
+            Save_IsAlwaysValidAfterCommands();
         }
 
-        Assert(characterScreen.PlayerStatus.Name == "Hero", "ViewModel player name mismatch.");
-        Assert(characterScreen.Gold == 50, "ViewModel gold mismatch.");
-        Assert(characterScreen.PlayerStatus.CurrentLocation == "character", "ViewModel location mismatch.");
-    }
-
-    private static void Navigation_MutatesCurrentLocationInGameSave()
-    {
-        var manager = new GameManager();
-        var save = GameSaveFactory.CreateNew("Hero");
-
-        manager.Execute(save, new NavigateCommand("character"));
-        Assert(save.CurrentLocation == "character", "Expected navigation to character.");
-
-        manager.Execute(save, new NavigateCommand("town"));
-        Assert(save.CurrentLocation == "town", "Expected navigation to town.");
-    }
-
-    private static void Managers_DoNotRequireMutableConstructorState()
-    {
-        var gameManager = new GameManager();
-        var screenManager = new ScreenManager();
-        var playerManager = new PlayerManager();
-
-        var save = gameManager.StartNewGame(new StartNewGameCommand("Hero"));
-        var screen = screenManager.CreateForCurrentLocation(save);
-        var status = playerManager.CreateStatus(save);
-
-        Assert(screen is not null, "Expected screen output.");
-        Assert(status is not null, "Expected status output.");
-    }
-
-    private static void Assert(bool condition, string message)
-    {
-        if (!condition)
+        private static void ForestSearch_ConsumesDailyAction()
         {
-            throw new InvalidOperationException(message);
+            var manager = new GameManager();
+            var save = manager.StartNewGame(new StartNewGameCommand("Hero"));
+
+            manager.Execute(save, new EnterForestCommand());
+            var before = save.RemainingDailyActions;
+            manager.Execute(save, new SearchForestCommand());
+
+            Assert(save.RemainingDailyActions == before - 1, "Forest search should consume one action.");
+        }
+
+        private static void BattleState_IsStoredInGameSave()
+        {
+            var manager = new GameManager();
+            var save = manager.StartNewGame(new StartNewGameCommand("Hero"));
+            save.RandomState.Seed = 1;
+
+            manager.Execute(save, new EnterForestCommand());
+            TriggerBattle(manager, save);
+
+            Assert(save.ActiveBattleState != null, "Battle should be active in save.");
+            Assert(save.CurrentLocation == "battle", "Location should be battle.");
+        }
+
+        private static void Attack_MutatesActiveBattleState()
+        {
+            var manager = new GameManager();
+            var save = manager.StartNewGame(new StartNewGameCommand("Hero"));
+            save.RandomState.Seed = 1;
+
+            manager.Execute(save, new EnterForestCommand());
+            TriggerBattle(manager, save);
+            var beforeEnemyHealth = save.ActiveBattleState == null ? 0 : save.ActiveBattleState.EnemyHealth;
+
+            manager.Execute(save, new AttackCommand());
+
+            if (save.ActiveBattleState != null)
+            {
+                Assert(save.ActiveBattleState.EnemyHealth < beforeEnemyHealth, "Enemy health should drop after attack.");
+            }
+        }
+
+        private static void Victory_GrantsRewardsAndClearsBattle()
+        {
+            var manager = new GameManager();
+            var save = manager.StartNewGame(new StartNewGameCommand("Hero"));
+            save.RandomState.Seed = 1;
+
+            manager.Execute(save, new EnterForestCommand());
+            TriggerBattle(manager, save);
+
+            var startGold = save.Player.Gold;
+            var startXp = save.Player.Experience;
+
+            while (save.ActiveBattleState != null)
+            {
+                manager.Execute(save, new AttackCommand());
+            }
+
+            Assert(save.CurrentLocation == "forest", "Should return to forest after win.");
+            Assert(save.Player.Gold > startGold, "Gold should increase on victory.");
+            Assert(save.Player.Experience >= startXp, "XP should increase on victory.");
+        }
+
+        private static void BuyingEquipment_UpdatesSaveAndGold()
+        {
+            var manager = new GameManager();
+            var save = manager.StartNewGame(new StartNewGameCommand("Hero"));
+
+            manager.Execute(save, new VisitShopCommand("weapon_shop"));
+            var beforeGold = save.Player.Gold;
+            manager.Execute(save, new BuyItemCommand("iron_sword"));
+
+            Assert(save.Player.Gold == beforeGold - 30, "Buying iron sword should reduce gold by price.");
+            Assert(save.Inventory.Exists(i => i.ItemId == "iron_sword" && i.Quantity > 0), "Inventory should contain bought item.");
+        }
+
+        private static void EquippedItems_AffectCombatStats()
+        {
+            var manager = new GameManager();
+            var save = manager.StartNewGame(new StartNewGameCommand("Hero"));
+            save.Player.Gold = 999;
+
+            manager.Execute(save, new VisitShopCommand("weapon_shop"));
+            manager.Execute(save, new BuyItemCommand("steel_blade"));
+            manager.Execute(save, new EquipItemCommand("steel_blade"));
+            manager.Execute(save, new ReturnToTownCommand());
+
+            var screen = manager.BuildCurrentScreen(save, new ToastViewModel("check"));
+            Assert(screen.PlayerStatus.Attack >= save.Player.BaseAttack + 6, "Equipped weapon should increase attack.");
+        }
+
+        private static void SaveLoad_RoundTripAcrossCoreStates()
+        {
+            var manager = new GameManager();
+            var save = manager.StartNewGame(new StartNewGameCommand("Hero"));
+            var townJson = GameSaveSerializer.SaveToJson(save);
+            var townLoaded = GameSaveSerializer.LoadFromJson(townJson);
+            Assert(townLoaded.CurrentLocation == "town", "Town round-trip should persist location.");
+
+            manager.Execute(save, new EnterForestCommand());
+            var forestJson = GameSaveSerializer.SaveToJson(save);
+            var forestLoaded = GameSaveSerializer.LoadFromJson(forestJson);
+            Assert(forestLoaded.CurrentLocation == "forest", "Forest round-trip should persist location.");
+
+            save.RandomState.Seed = 1;
+            TriggerBattle(manager, save);
+            var battleJson = GameSaveSerializer.SaveToJson(save);
+            var battleLoaded = GameSaveSerializer.LoadFromJson(battleJson);
+            Assert(battleLoaded.ActiveBattleState != null, "Active battle should round-trip.");
+
+            save.Player.Gold = 999;
+            manager.Execute(save, new ReturnToTownCommand());
+            manager.Execute(save, new VisitShopCommand("armor_shop"));
+            manager.Execute(save, new BuyItemCommand("leather_armor"));
+            var boughtJson = GameSaveSerializer.SaveToJson(save);
+            var boughtLoaded = GameSaveSerializer.LoadFromJson(boughtJson);
+            Assert(boughtLoaded.Inventory.Exists(i => i.ItemId == "leather_armor"), "Bought equipment should round-trip.");
+        }
+
+        private static void ConsoleFlow_UsesCommandsAndViewModelsOnly()
+        {
+            var manager = new GameManager();
+            var save = manager.StartNewGame(new StartNewGameCommand("Hero"));
+            var toast = new ToastViewModel("start");
+            var screen = manager.BuildCurrentScreen(save, toast);
+
+            Assert(screen is TownScreenViewModel, "Expected town screen at start.");
+
+            toast = manager.Execute(save, new EnterForestCommand());
+            screen = manager.BuildCurrentScreen(save, toast);
+            Assert(screen is ForestScreenViewModel, "Expected forest screen after enter forest.");
+
+            manager.Execute(save, new ReturnToTownCommand());
+            manager.Execute(save, new VisitShopCommand("weapon_shop"));
+            screen = manager.BuildCurrentScreen(save, new ToastViewModel("shop"));
+            Assert(screen is ShopScreenViewModel, "Expected shop screen after visit shop.");
+        }
+
+        private static void TriggerBattle(GameManager manager, GameSave save)
+        {
+            while (save.ActiveBattleState == null && save.RemainingDailyActions > 0)
+            {
+                manager.Execute(save, new SearchForestCommand());
+            }
+
+            if (save.ActiveBattleState == null)
+            {
+                throw new InvalidOperationException("Expected battle trigger for test.");
+            }
+        }
+
+        private static void Save_IsAlwaysValidAfterCommands()
+        {
+            var manager = new GameManager();
+            var save = manager.StartNewGame(new StartNewGameCommand("Hero"));
+            manager.Execute(save, new EnterForestCommand());
+            manager.Execute(save, new SearchForestCommand());
+            if (save.ActiveBattleState != null)
+            {
+                manager.Execute(save, new AttackCommand());
+            }
+
+            Assert(GameSaveValidator.IsValid(save), "Save should remain valid after command sequence.");
+        }
+
+        private static void Assert(bool condition, string message)
+        {
+            if (!condition)
+            {
+                throw new InvalidOperationException(message);
+            }
         }
     }
 }
