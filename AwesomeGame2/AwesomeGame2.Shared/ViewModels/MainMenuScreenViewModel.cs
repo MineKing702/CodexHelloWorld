@@ -1,7 +1,7 @@
 namespace AwesomeGame2.Shared.ViewModels;
 
-public sealed record TownScreenViewModel(
+public sealed record MainMenuScreenViewModel(
     PlayerStatusViewModel PlayerStatus,
     IReadOnlyList<MenuOptionViewModel> MenuOptions,
     ToastViewModel? Toast)
-    : ScreenViewModel("town", "Town Square", PlayerStatus, MenuOptions, Toast);
+    : ScreenViewModel("main_menu", "Main Menu", PlayerStatus, MenuOptions, Toast);
