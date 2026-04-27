@@ -1,13 +1,22 @@
-using AwesomeGame2.Tests;
+using System;
 
-try
+namespace AwesomeGame2.Tests
 {
-    GameArchitectureTests.RunAll();
-    Console.WriteLine("All architecture tests passed.");
-    return 0;
-}
-catch (Exception ex)
-{
-    Console.Error.WriteLine($"Architecture test failure: {ex.Message}");
-    return 1;
+    public static class Program
+    {
+        public static int Main()
+        {
+            try
+            {
+                GameArchitectureTests.RunAll();
+                Console.WriteLine("All architecture tests passed.");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Architecture test failure: " + ex.Message);
+                return 1;
+            }
+        }
+    }
 }

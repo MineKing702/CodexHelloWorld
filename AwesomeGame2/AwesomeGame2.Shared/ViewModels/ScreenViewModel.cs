@@ -1,7 +1,10 @@
-namespace AwesomeGame2.Shared.ViewModels;
+using System.Collections.Generic;
 
-public abstract record ScreenViewModel(
-    string Title,
-    PlayerStatusViewModel PlayerStatus,
-    IReadOnlyList<MenuOptionViewModel> MenuOptions,
-    ToastViewModel? Toast);
+namespace AwesomeGame2.Shared.ViewModels
+{
+    public abstract record ScreenViewModel(
+        string Title,
+        PlayerStatusViewModel PlayerStatus,
+        IReadOnlyList<MenuOptionViewModel> MenuOptions,
+        ToastViewModel Toast);
+}

@@ -1,28 +1,42 @@
+using System;
 using System.Text.Json;
 using AwesomeGame2.Shared.Saves;
 
-namespace AwesomeGame2.Shared.Serialization;
-
-public static class GameSaveSerializer
+namespace AwesomeGame2.Shared.Serialization
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    public static class GameSaveSerializer
     {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = false
-    };
+        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = false
+        };
 
-    public static string SaveToJson(GameSave save)
-    {
-        ArgumentNullException.ThrowIfNull(save);
-        return JsonSerializer.Serialize(save, JsonOptions);
-    }
+        public static string SaveToJson(GameSave save)
+        {
+            if (save == null)
+            {
+                throw new ArgumentNullException(nameof(save));
+            }
 
-    public static GameSave LoadFromJson(string json)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(json);
+            return JsonSerializer.Serialize(save, JsonOptions);
+        }
 
-        var loaded = JsonSerializer.Deserialize<GameSave>(json, JsonOptions);
-        return loaded ?? throw new InvalidOperationException("Unable to deserialize GameSave JSON.");
+        public static GameSave LoadFromJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                throw new ArgumentException("JSON is required.", nameof(json));
+            }
+
+            var loaded = JsonSerializer.Deserialize<GameSave>(json, JsonOptions);
+            if (loaded == null)
+            {
+                throw new InvalidOperationException("Unable to deserialize GameSave JSON.");
+            }
+
+            return loaded;
+        }
     }
 }

@@ -2,9 +2,10 @@ using System.Collections.Generic;
 
 namespace AwesomeGame2.Shared.ViewModels
 {
-    public sealed record TownScreenViewModel(
+    public sealed record ForestScreenViewModel(
         PlayerStatusViewModel PlayerStatus,
+        string ForestSummary,
         IReadOnlyList<MenuOptionViewModel> MenuOptions,
         ToastViewModel Toast)
-        : ScreenViewModel("Town", PlayerStatus, MenuOptions, Toast);
+        : ScreenViewModel("Forest", PlayerStatus, MenuOptions, Toast);
 }
